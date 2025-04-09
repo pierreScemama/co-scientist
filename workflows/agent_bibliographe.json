@@ -1,0 +1,196 @@
+{
+  "name": "Agent Bibliographe",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "minutesEach": false,
+              "secondsInterval": 10
+            }
+          ]
+        }
+      },
+      "name": "When chat message received",
+      "type": "n8n-nodes-base.chatTrigger",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"message\"].toLowerCase().includes(\"recherche\") && $json[\"message\"].toLowerCase().includes(\"bibliographique\")}}",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "name": "Est-ce une requête bibliographique?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "baseUrl": "http://host.docker.internal:11434",
+        "model": "mistral",
+        "input": "=Tu es l'Agent Bibliographe du système Co-Scientist, spécialisé en économie écologique. Ton rôle est d'analyser les requêtes de recherche bibliographique et d'y répondre de manière structurée.\n\nREQUÊTE DE L'UTILISATEUR :\n{{$node[\"When chat message received\"].json[\"message\"]}}\n\nRéponds avec :\n1. Une analyse de la requête\n2. Les termes clés à rechercher\n3. Les suggestions de sources ou bases de données à consulter\n4. Un premier aperçu des concepts liés à cette recherche",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 800
+        }
+      },
+      "name": "Ollama Chat Model",
+      "type": "n8n-nodes-base.ollama",
+      "typeVersion": 1,
+      "position": [
+        850,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "={{$node[\"Ollama Chat Model\"].json[\"response\"]}}"
+      },
+      "name": "Extraire Réponse LLM",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO co_scientist.conversations (session_id, speaker, message, metadata)\nVALUES \n('session-{{Date.now()}}', 'user', '{{$node[\"When chat message received\"].json[\"message\"]}}', '{\"agent\":\"bibliographe\"}'),\n('session-{{Date.now()}}', 'agent_bibliographe', '{{$node[\"Extraire Réponse LLM\"].json[\"output\"]}}', '{\"agent\":\"bibliographe\"}');",
+        "additionalFields": {}
+      },
+      "name": "Enregistrer Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-coscientist",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Réponse par défaut",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        850,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"message\": {{$node[\"Extraire Réponse LLM\"].json[\"output\"]}}}",
+        "options": {}
+      },
+      "name": "Répondre avec LLM",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        250
+      ]
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Est-ce une requête bibliographique?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Est-ce une requête bibliographique?": {
+      "main": [
+        [
+          {
+            "node": "Ollama Chat Model",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Réponse par défaut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "main": [
+        [
+          {
+            "node": "Extraire Réponse LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire Réponse LLM": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer Conversation": {
+      "main": [
+        [
+          {
+            "node": "Répondre avec LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
