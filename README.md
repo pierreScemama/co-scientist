@@ -11,61 +11,74 @@ Co-Scientist est un assistant de recherche intelligent composé de plusieurs age
 - **Agent Concepteur d'Expériences** : Conception de protocoles expérimentaux
 - **Agent Coordinateur** : Orchestration des différents agents et interface utilisateur
 
-## Prérequis
+## Guide d'installation simple
 
-- Docker et Docker Compose
-- Ollama (pour l'exécution locale de modèles de langage)
-- Au moins un modèle installé dans Ollama (ex: `ollama pull mistral` ou `ollama pull llama3`)
+### Prérequis
+- Docker et Docker Compose déjà installés
+- Ollama déjà installé et fonctionnel
 
-## Installation
+### Option 1 : Installation minimale (n8n + Ollama uniquement)
 
-1. Clonez ce dépôt :
-```bash
-git clone https://github.com/pierreScemama/co-scientist.git
-cd co-scientist
+Si vous souhaitez simplement utiliser n8n avec votre instance locale d'Ollama :
+
+1. Créez un fichier docker-compose.yml dans votre dossier n8n avec ce contenu :
+
+```yaml
+version: '3'
+
+services:
+  n8n:
+    image: n8nio/n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=votremotdepasse
+      - NODE_ENV=production
+      - N8N_HOST=localhost
+      - N8N_PROTOCOL=http
+      - N8N_PORT=5678
+    volumes:
+      - n8n_data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  n8n_data:
+    external: false
 ```
 
-2. Assurez-vous que le script d'initialisation est exécutable :
-```bash
-chmod +x init-db.sh
+2. Lancez n8n avec :
 ```
-
-3. Modifiez le fichier docker-compose.yml si nécessaire (adaptez les mots de passe, etc.)
-
-4. Démarrez les services :
-```bash
 docker-compose up -d
 ```
 
-5. Accédez à n8n via http://localhost:5678 et configurez vos workflows
+3. Dans n8n, utilisez l'URL `http://host.docker.internal:11434` pour vous connecter à Ollama.
 
-## Configuration de l'agent IA local
+### Option 2 : Installation complète (avec PostgreSQL)
 
-1. Assurez-vous qu'Ollama est en cours d'exécution sur votre machine hôte
-2. Dans n8n, utilisez les nœuds Ollama avec l'URL de base : `http://host.docker.internal:11434`
+Pour une installation complète avec base de données PostgreSQL (recommandé pour projets avancés) :
 
-## Structure de la base de données
+**Instructions détaillées à venir**
 
-La base de données PostgreSQL inclut plusieurs tables pour le stockage des données des agents :
+## Utilisation des agents
 
-- **publications** : Stocke les informations sur les publications scientifiques
-- **hypotheses** : Conserve les hypothèses générées par l'agent correspondant
-- **experiments** : Détaille les protocoles expérimentaux conçus
-- **agent_memory** : Stocke le contexte et la mémoire de chaque agent
-- **conversations** : Archive les interactions avec les utilisateurs
+### Agent Bibliographe
+
+1. Créez un nouveau workflow dans n8n
+2. Ajoutez un déclencheur "When chat message received"
+3. Ajoutez un nœud Ollama avec l'URL `http://host.docker.internal:11434`
+4. Configurez le prompt pour l'Agent Bibliographe
+5. Testez avec le chat n8n
+
+## Structure du projet
+
+- **workflows/** : Exemples de workflows n8n pour les différents agents
+- **docker-compose.yml** : Configuration pour les services Docker
+- **init-db.sh** : Script d'initialisation pour PostgreSQL (option 2 uniquement)
 
 ## Développement
 
-Pour ajouter de nouveaux agents ou modifier la structure de la base de données :
-
-1. Mettez à jour le script init-db.sh avec les nouvelles tables requises
-2. Reconstruisez les services :
-```bash
-docker-compose down
-docker-compose up -d --build
-```
-
-## Liens avec d'autres outils
-
-- **Zotero** : Utilise l'API Zotero pour accéder à votre bibliothèque de recherche
-- **Notion** : Peut se synchroniser avec vos bases de données Notion via l'API
+Pour l'instant, concentrez-vous sur la création et l'amélioration des workflows n8n pour chaque agent. La documentation sera enrichie au fur et à mesure.
